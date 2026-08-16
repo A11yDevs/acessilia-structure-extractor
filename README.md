@@ -1,6 +1,6 @@
 # Acessilia Structure Extractor
 
-[![License: GPL v3+](https://img.shields.io/badge/License-GPL%20v3%2B-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Structural extraction service for Acessilia, providing document parsing and canonical structure through REST API and MCP.
 
@@ -314,11 +314,8 @@ Contributors retain authorship of their contributions and are expected to contri
 
 ## Copyright and License
 
-Copyright (C) 2026 Marcelo Inuzuka and Acessilia Structure Extractor contributors
+Copyright (c) 2026 Jhonata Fernandes Cordeiro
+Copyright (c) 2026 Marcelo Inuzuka and Acessilia Structure Extractor contributors
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
+This project is licensed under the MIT License.
 See the [LICENSE](LICENSE) file for the full license text.

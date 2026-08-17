@@ -1,0 +1,3 @@
+[submodule "tests/dataset"]
+	path = tests/dataset
+	url = https://github.com/A11yDevs/acessilia-dataset.git

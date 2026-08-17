@@ -1,0 +1,47 @@
+# docker-compose para validação de snapshots com docling-serve
+#
+# Uso:
+#   docker compose -f docker-compose.test-snapshot.yml up --build validator
+#
+# Isso sobe o docling-serve-cpu, extrai todos os documentos
+# do dataset via API REST e compara com os expected outputs.
+#
+# Para atualizar os snapshots (após mudanças no extrator):
+#   docker compose -f docker-compose.test-snapshot.yml run --rm validator \
+#     --backend serve --docling-serve http://docling-serve:5001 --update
+
+services:
+  docling-serve:
+    image: ghcr.io/docling-project/docling-serve-cpu:latest
+    ports:
+      - "5001:5001"
+    volumes:
+      - docling-models:/root/.cache/docling
+    environment:
+      - DOCLING_SERVE_ENABLE_UI=false
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 300s
+
+  validator:
+    build:
+      context: .
+      target: production
+    volumes:
+      - ./tests/dataset:/app/tests/dataset
+      - ./tests/snapshot_comparator.py:/app/tests/snapshot_comparator.py
+      - ./scripts/validate_snapshots.py:/app/scripts/validate_snapshots.py
+    depends_on:
+      docling-serve:
+        condition: service_healthy
+    command: [
+      "python3", "scripts/validate_snapshots.py",
+      "--backend", "serve",
+      "--docling-serve", "http://docling-serve:5001",
+    ]
+
+volumes:
+  docling-models:

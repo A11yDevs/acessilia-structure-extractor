@@ -1,12 +1,10 @@
-"""Dockerfile para o Acessilia Structure Extractor.
+# Dockerfile para o Acessilia Structure Extractor
+#
+# Variantes de build:
+#   docker build --target production -t acessilia-extractor:latest .
+#   docker build --target with-docling -t acessilia-extractor:with-docling .
+#   docker build --target validate-snapshots -t acessilia-extractor:validate .
 
-Variantes de build:
-  docker build --target production -t acessilia-extractor:latest .
-  docker build --target production-serve -t acessilia-extractor:serve .
-  docker build --target test -t acessilia-extractor:test .
-"""
-
-# === Estágio base: Python + runtime mínimo ===
 FROM python:3.11-slim AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -15,7 +13,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Dependências de sistema mínimas
+# Dependências de sistema mínimas (necessárias para PyMuPDF)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 libglib2.0-0 poppler-utils \
     && rm -rf /var/lib/apt/lists/*
@@ -23,11 +21,38 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY pyproject.toml ./
 COPY src/ ./src/
 
-# Instala o pacote (sem docling)
+# Instala o pacote base (sem docling)
 RUN pip install --upgrade pip && pip install . && rm -rf ~/.cache
+
+# === Estágio com Docling (para validação de snapshots) ===
+FROM base AS with-docling
+
+# Dependências extras do docling/pytorch/rapidocr
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg libmagic1 tesseract-ocr \
+    && rm -rf /var/lib/apt/lists/*
+
+# Reinstala com o extra docling
+RUN pip install --upgrade pip && pip install ".[docling]" && rm -rf ~/.cache
+
+COPY . .
+
+# === Estágio de validação de snapshots (usa docling local) ===
+FROM with-docling AS validate-snapshots
+ENTRYPOINT ["python3", "scripts/validate_snapshots.py"]
+CMD ["--help"]
 
 # === Estágio de produção: sem Docling ===
 FROM base AS production
+COPY . .
+EXPOSE 8000
+CMD ["acessilia-extract"]
+
+# === Estágio de teste: sem Docling ===
+FROM base AS test
+RUN pip install ".[dev]" && rm -rf ~/.cache
+COPY . .
+CMD ["pytest", "tests/", "-v"]
 COPY . .
 EXPOSE 8000
 CMD ["acessilia-extract"]

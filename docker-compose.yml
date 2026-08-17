@@ -1,51 +1,50 @@
 # docker-compose para desenvolvimento e produção
 #
 # Uso:
-#   docker compose up -d                  # Sobe structure-extractor + docling-serve
+#   docker compose up -d                  # Sobe structure-extractor com docling
 #   docker compose run --rm test          # Executa testes
-#
-# Para usar docling-serve de terceiros:
-#   docker compose up acessilia-extractor  # Sem docling-serve
-#
-# Imagens docling-serve disponíveis em:
-#   ghcr.io/docling/docling-serve:latest
+#   docker compose run --rm validate      # Valida snapshots
 
 version: "3.9"
 
 services:
-  # --- Serviço principal (slim) ---
+  # --- Serviço principal (com docling) ---
   acessilia-extractor:
     build:
       context: .
-      target: production
-    image: acessilia-extractor:latest
+      target: with-docling
+    image: acessilia-extractor:with-docling
     ports:
       - "8000:8000"
-    environment:
-      - DOCLING_SERVE_URL=http://docling-serve:5001
     volumes:
       - ./var:/app/var
-    depends_on:
-      docling-serve:
-        condition: service_healthy
+      - docling-models:/root/.cache/docling
     command: ["acessilia-extract"]
 
-  # --- docling-serve (backend de extração com modelos) ---
-  docling-serve:
-    image: ghcr.io/docling/docling-serve:latest
-    ports:
-      - "5001:5001"
+  # --- Testes ---
+  test:
+    build:
+      context: .
+      target: test
+    image: acessilia-extractor:test
     volumes:
-      - docling-models:/models
-    environment:
-      - DOCLING_SERVE_OPTIONS=--port 5001
-      # Monta modelos persistentes para evitar re-download
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5001/api/v1/info"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 120s
+      - ./tests:/app/tests
+      - ./src:/app/src
+    command: ["pytest", "tests/", "-v"]
+
+  # --- Validação de snapshots ---
+  validate:
+    build:
+      context: .
+      target: validate-snapshots
+    image: acessilia-extractor:validate
+    volumes:
+      - ./tests/dataset:/app/tests/dataset
+      - ./tests/snapshot_comparator.py:/app/tests/snapshot_comparator.py
+      - ./scripts/validate_snapshots.py:/app/scripts/validate_snapshots.py
+      - docling-models:/root/.cache/docling
+    command: ["scripts/validate_snapshots.py"]
 
 volumes:
+  docling-models:
   docling-models:

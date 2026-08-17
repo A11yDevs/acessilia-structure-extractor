@@ -116,13 +116,13 @@ class DoclingManifestExtractor(BaseExtractor):
 
 
 class DoclingServeExtractor(BaseExtractor):
-    """Extrator remoto via docling-serve (API REST).
+    """Extrator remoto via docling-serve (API REST v1).
 
     O docling-serve deve estar rodando em um host acessível.
     Docker recomendado:
 
-        docker run -p 5001:5001 -v docling-models:/models \\
-            ghcr.io/docling/docling-serve:latest
+        docker run -p 5001:5001 -v docling-models:/root/.cache/docling \\
+            ghcr.io/docling-project/docling-serve-cpu:latest
     """
 
     def __init__(self, base_url: str = "http://docling-serve:5001"):
@@ -138,17 +138,26 @@ class DoclingServeExtractor(BaseExtractor):
         started_at = datetime.now(timezone.utc)
         started_clock = perf_counter()
 
-        with httpx.Client(base_url=self.base_url, timeout=300) as client:
-            # 1. Upload do documento
+        with httpx.Client(base_url=self.base_url, timeout=600) as client:
+            # 1. Envia o arquivo via multipart (síncrono — não usa fila)
+            #    Precisa de to_formats=["json"] para receber json_content
             with source_path.open("rb") as f:
                 upload_resp = client.post(
-                    "/v1/convert/document",
-                    files={"document": (source_path.name, f, "application/pdf")},
+                    "/v1/convert/file",
+                    files={"files": (source_path.name, f, "application/pdf")},
+                    data={"to_formats": ["json"]},
                 )
             upload_resp.raise_for_status()
             result = upload_resp.json()
 
-            docling_doc = result.get("document") or result
+            # A resposta do docling-serve v1.30+ tem formato:
+            # { "document": { "json_content": { ... DoclingDocument ... } }, ... }
+            doc_entry = result.get("document") or {}
+            json_content = doc_entry.get("json_content")
+            if json_content is not None:
+                docling_doc = json_content  # já é dict
+            else:
+                docling_doc = result
 
         duration_ms = round((perf_counter() - started_clock) * 1000)
         completed_at = datetime.now(timezone.utc)
@@ -158,7 +167,7 @@ class DoclingServeExtractor(BaseExtractor):
             started_at=started_at,
             completed_at=completed_at,
             duration_ms=duration_ms,
-            version=_extract_serve_version(result, client),
+            version=_extract_serve_version(client),
             configuration={
                 "extractor": "docling-serve",
                 "base_url": self.base_url,
@@ -167,8 +176,12 @@ class DoclingServeExtractor(BaseExtractor):
 
 
 class _BuildDoclingDocument:
-    """Wrapper para compatibilizar a resposta JSON do docling-serve
-    com a interface esperada pelo builder (iterate_items, pages, num_pages)."""
+    """Wrapper para compatibilizar o DoclingDocument v2 (docling-serve 1.30+)
+    com a interface esperada pelo builder (iterate_items, pages, num_pages).
+
+    O novo formato tem coleções separadas: texts, pictures, tables, groups, etc.
+    O body é uma árvore com children que referenciam itens via $ref.
+    """
 
     def __init__(self, payload: dict[str, Any]) -> None:
         self._payload = payload
@@ -176,27 +189,57 @@ class _BuildDoclingDocument:
         self._build_items()
 
     def _build_items(self) -> None:
-        items: list[dict] = self._payload.get("items") or []
-        for idx, item in enumerate(items):
-            self._items.append((_ItemProxy(item), item.get("tree_level", 1)))
+        # Coleções de itens no novo formato
+        collections = {
+            "texts": 1,
+            "pictures": 1,
+            "tables": 1,
+            "groups": 1,
+            "key_value_items": 1,
+            "form_items": 1,
+        }
+        seen: set[str] = set()
+        for coll_name, default_level in collections.items():
+            items = self._payload.get(coll_name, [])
+            for item in items:
+                ref = item.get("self_ref", "")
+                if ref and ref in seen:
+                    continue
+                if ref:
+                    seen.add(ref)
+                level = item.get("level", default_level)
+                if isinstance(level, dict):
+                    level = 1
+                self._items.append((_ItemProxy(item), level))
 
     def iterate_items(self, **kwargs: Any) -> Any:
         return iter(self._items)
 
     def num_pages(self) -> int:
-        pages = self._payload.get("pages") or []
-        return len(pages)
+        pages = self._payload.get("pages", {})
+        if isinstance(pages, dict):
+            return len(pages)
+        if isinstance(pages, list):
+            return len(pages)
+        return 0
 
     @property
     def pages(self) -> dict[int, Any]:
-        return {
-            p["page_number"]: _PageProxy(p)
-            for p in (self._payload.get("pages") or [])
-        }
+        pages = self._payload.get("pages", {})
+        if isinstance(pages, dict):
+            return {
+                int(k): _PageProxy(v) for k, v in pages.items()
+            }
+        if isinstance(pages, list):
+            return {
+                p.get("page_number", i): _PageProxy(p)
+                for i, p in enumerate(pages)
+            }
+        return {}
 
 
 class _ItemProxy:
-    """Proxy para itens individuais do documento."""
+    """Proxy para itens individuais do documento Docling v2."""
 
     def __init__(self, data: dict[str, Any]) -> None:
         self._data = data
@@ -214,12 +257,15 @@ class _ItemProxy:
         if name == "self_ref":
             return self._data.get("self_ref")
         if name in ("level", "confidence", "score"):
-            return self._data.get(name)
+            val = self._data.get(name)
+            if isinstance(val, dict):
+                return None
+            return val
         if name in ("text", "orig", "name", "marker", "enumerated", "content_layer"):
             return self._data.get(name)
         if name == "table":
-            return self._data.get("table") or self._data.get("table_ast")
-        for candidate in ("rows", "table_ast", "cells"):
+            return self._data.get("table") or self._data.get("data")
+        for candidate in ("rows", "data", "cells"):
             val = self._data.get(candidate)
             if val is not None:
                 return val
@@ -272,11 +318,12 @@ class _SizeProxy:
         self.height = data.get("height")
 
 
-def _extract_serve_version(result: dict, client: Any) -> str:
+def _extract_serve_version(client: Any) -> str:
     try:
-        r = client.get("/api/v1/info")
+        r = client.get("/version")
         r.raise_for_status()
-        return r.json().get("version", "docling-serve")
+        data = r.json()
+        return data.get("version") or data.get("docling_serve_version", "docling-serve")
     except Exception:
         return "docling-serve"
 

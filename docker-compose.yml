@@ -1,0 +1,51 @@
+# docker-compose para desenvolvimento e produção
+#
+# Uso:
+#   docker compose up -d                  # Sobe structure-extractor + docling-serve
+#   docker compose run --rm test          # Executa testes
+#
+# Para usar docling-serve de terceiros:
+#   docker compose up acessilia-extractor  # Sem docling-serve
+#
+# Imagens docling-serve disponíveis em:
+#   ghcr.io/docling/docling-serve:latest
+
+version: "3.9"
+
+services:
+  # --- Serviço principal (slim) ---
+  acessilia-extractor:
+    build:
+      context: .
+      target: production
+    image: acessilia-extractor:latest
+    ports:
+      - "8000:8000"
+    environment:
+      - DOCLING_SERVE_URL=http://docling-serve:5001
+    volumes:
+      - ./var:/app/var
+    depends_on:
+      docling-serve:
+        condition: service_healthy
+    command: ["acessilia-extract"]
+
+  # --- docling-serve (backend de extração com modelos) ---
+  docling-serve:
+    image: ghcr.io/docling/docling-serve:latest
+    ports:
+      - "5001:5001"
+    volumes:
+      - docling-models:/models
+    environment:
+      - DOCLING_SERVE_OPTIONS=--port 5001
+      # Monta modelos persistentes para evitar re-download
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/api/v1/info"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+volumes:
+  docling-models:

@@ -1,23 +1,26 @@
-# Byte-compiled / optimized / DLL files
+# Python
 __pycache__/
-*.py[codz]
-*$py.class
-
-# C extensions
-*.so
-
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
+*.py[cod]
+*.egg-info/
 dist/
-downloads/
-eggs/
+build/
 .eggs/
-lib/
-lib64/
-parts/
-sdist/
+
+# Virtual environment
+venv/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+
+# Runtime
+var/
+temp/
+*.processing-manifest.json
+
+# OS
+.DS_Store
 var/
 wheels/
 share/python-wheels/

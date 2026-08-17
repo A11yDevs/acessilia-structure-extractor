@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=64", "setuptools-scm>=8"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "acessilia-structure-extractor"
+version = "0.1.0"
+description = "Structural extraction service for Acessilia — document parsing and canonical structure extraction"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.11"
+authors = [
+    {name = "Jhonata Fernandes Cordeiro"},
+    {name = "Marcelo Inuzuka and Acessilia Structure Extractor contributors"},
+]
+
+dependencies = [
+    "pydantic>=2",
+    "jsonschema",
+    "httpx>=0.28",
+    "PyMuPDF",
+]
+
+[project.scripts]
+acessilia-extract = "acessilia_extractor.cli:main"
+
+[project.optional-dependencies]
+docling = [
+    "docling>=2",
+]
+docling-serve = [
+    "docling-core>=2",
+    "httpx>=0.28",
+]
+dev = [
+    "pytest>=7",
+    "pytest-asyncio",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+namespaces = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]

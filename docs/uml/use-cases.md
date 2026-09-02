@@ -65,7 +65,7 @@ graph TB
 **Basic Flow:**
 
 1. Actor submits a document via CLI, REST API, or MCP
-2. System selects the appropriate extraction backend (Docling, docling-serve, or PyMuPDF)
+2. System selects the extraction backend — **docling-serve** (default), Docling (local), or PyMuPDF (planned)
 3. System extracts structural elements (headings, paragraphs, tables, figures, etc.)
 4. System sanitizes text and normalizes tables
 5. System builds the Processing Manifest with elements, observations, and obligations
@@ -113,8 +113,8 @@ graph TB
 
 **Basic Flow:**
 
-1. Actor specifies backend via CLI flags (`--docling-serve`, `--no-ocr`)
-2. System instantiates the appropriate extractor
+1. Actor specifies backend via CLI flags (`--docling-serve`, `--no-ocr`) or sets `DOCLING_SERVE_URL`
+2. System instantiates the appropriate extractor (defaults to `DoclingServeExtractor`)
 3. System proceeds with extraction using the configured backend
 
 ---

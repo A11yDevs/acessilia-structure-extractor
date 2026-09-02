@@ -89,8 +89,7 @@
       "additionalProperties": false,
       "properties": {
         "name": {
-          "const": "docling",
-          "default": "docling",
+          "minLength": 1,
           "title": "Name",
           "type": "string"
         },
@@ -121,6 +120,7 @@
         }
       },
       "required": [
+        "name",
         "version",
         "started_at",
         "completed_at",

@@ -6,7 +6,7 @@ The Acessilia Structure Extractor supports multiple document extraction backends
 
 ## Docling
 
-[Docling](https://github.com/docling-project/docling) is the primary extraction engine. Developed by IBM, it provides deep structural understanding of documents.
+[Docling](https://github.com/docling-project/docling) is the document understanding engine developed by IBM. It provides deep structural understanding of documents and is used indirectly via **docling-serve** (recommended) or directly as a local library.
 
 ### Features
 
@@ -43,8 +43,8 @@ graph LR
 
 Docling is used in two ways:
 
-1. **Local** (`DoclingManifestExtractor`): Installed in the same environment, loads models at runtime.
-2. **Remote** (`DoclingServeExtractor`): Via `docling-serve`, REST communication.
+1. **Remote (recommended)** — `DoclingServeExtractor`: via `docling-serve`, REST communication. No local ML dependencies required.
+2. **Local** — `DoclingManifestExtractor`: installed in the same environment, loads models at runtime. Requires the `[docling]` extra.
 
 ### Dependencies
 
@@ -57,16 +57,16 @@ docling = [
 
 ### Model Cache
 
-Models are downloaded automatically on first run:
+Models are downloaded automatically on first request:
 
-- **Hugging Face**: `~/.cache/huggingface` (or `/root/.cache/docling` in Docker)
-- **RapidOCR**: cache managed by Docling
+- **Docker volume**: `docling-models` (mounted at `/root/.cache/docling`)
+- **Local**: `~/.cache/huggingface` and `~/.cache/docling`
 
-> ⚠️ The first run is significantly slower due to model downloads.
+> ⚠️ The first request is significantly slower due to model downloads.
 
-## docling-serve
+## docling-serve (Recommended)
 
-[docling-serve](https://github.com/docling-project/docling-serve) is the REST server that exposes Docling as a service.
+[docling-serve](https://github.com/docling-project/docling-serve) is the REST server that exposes Docling as a service. It is the **recommended** way to use Docling with the Acessilia Structure Extractor, as it avoids installing PyTorch and heavy ML dependencies locally.
 
 ### Features
 
@@ -87,7 +87,7 @@ Models are downloaded automatically on first run:
 # Start docling-serve
 docker run -p 5001:5001 \
   -v docling-models:/root/.cache/docling \
-  ghcr.io/docling-project/docling-serve-cpu:latest
+  ghcr.io/docling-project/docling-serve-cpu:v1.32.0
 
 # Extract via API
 curl -X POST http://localhost:5001/v1/convert/file \
@@ -136,16 +136,17 @@ PyMuPDF is listed as a base dependency and is planned as an alternative backend 
 
 ## Comparison
 
-| Criteria | Docling | docling-serve | PyMuPDF |
-|---|---|---|---|
+| Criteria | docling-serve ★ | Docling | PyMuPDF |
+|---|---|---|---|---|
 | **Structural accuracy** | High | High | Medium |
-| **Speed** | Slow (models) | Slow + network latency | Fast |
-| **Image size** | ~3 GB | ~3 GB (server) | ~200 MB |
+| **Speed** | Slow + network latency | Slow (models) | Fast |
+| **Image size** | ~3 GB (server) | ~3 GB | ~200 MB |
 | **OCR** | ✅ | ✅ | ❌ |
 | **Tables** | ✅ | ✅ | ⚠️ |
-| **ML models** | ✅ | ✅ | ❌ |
+| **ML models** | ✅ (server-side) | ✅ | ❌ |
 | **Offline use** | ✅ (after cache) | ✅ (after cache) | ✅ |
-| **Recommended for** | Maximum accuracy | Separate deployment | Fast extraction |
+| **Local ML deps** | ❌ (no PyTorch) | ✅ (PyTorch) | ❌ |
+| **Recommended for** | **Default — maximum accuracy without local ML** | Maximum accuracy (legacy) | Fast extraction |
 
 ## Post-processing Pipeline
 

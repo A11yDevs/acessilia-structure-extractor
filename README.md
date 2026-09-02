@@ -4,6 +4,32 @@
 
 Structural extraction service for Acessilia, providing document parsing and canonical structure through REST API and MCP.
 
+## Quick Start
+
+```bash
+# 1. Clone and install the base package
+git clone https://github.com/A11yDevs/acessilia-structure-extractor.git
+cd acessilia-structure-extractor
+pip install .
+
+# 2. Configure environment (optional)
+cp .env.example .env
+
+# 3. Start docling-serve (recommended — avoids local PyTorch)
+docker pull ghcr.io/docling-project/docling-serve-cpu:v1.32.0
+docker run -d \
+  --name docling-serve \
+  -p 5001:5001 \
+  -v docling-models:/root/.cache/docling \
+  ghcr.io/docling-project/docling-serve-cpu:v1.32.0
+
+# 4. Extract a document
+export DOCLING_SERVE_URL=http://localhost:5001
+acessilia-extract documento.pdf
+```
+
+> See the [Installation Guide](docs/installation.md) for detailed setup instructions.
+
 ## Overview
 
 **Acessilia Structure Extractor** is a standalone document-structure extraction service for the [Acessilia](https://github.com/A11yDevs/acessilia) ecosystem.
@@ -42,24 +68,29 @@ Separating structural extraction into its own service provides several benefits:
                       |
           +-----------+-----------+
           |                       |
-       Docling                  PyMuPDF
-          |
-        Models
+   docling-serve ★           PyMuPDF
+   (via REST API)
+      |
+    Models
 ```
 
-The service should expose an **Acessilia canonical document structure** rather than extraction-engine-specific objects.
+The service exposes an **Acessilia canonical document structure** rather than extraction-engine-specific objects.
 
 ```text
-DoclingDocument
+Document (PDF, DOCX, ...)
       |
       v
-Docling Adapter
+docling-serve (REST API)
       |
       v
-Acessilia Canonical Structure
+DoclingServeExtractor
       |
-      +-- REST API
-      +-- MCP
+      v
+Acessilia Processing Manifest
+      |
+      +-- CLI
+      +-- REST API (planned)
+      +-- MCP (planned)
       +-- Acessilia Orchestrator
       +-- Other consumers
 ```
@@ -156,22 +187,20 @@ The MCP layer should expose Acessilia-oriented capabilities instead of leaking i
 
 ## Extraction Backends
 
-The architecture is intended to support multiple extraction backends.
+The architecture supports multiple extraction backends behind a common abstraction (`BaseExtractor`).
 
-Initial candidates include:
-
-- **Docling** — advanced document parsing and structural understanding;
-- **PyMuPDF** — lightweight PDF inspection and extraction;
-- other specialized extractors as the project evolves.
-
-Backends should be implemented behind a common internal abstraction.
+| Backend | Type | Recommended | Description |
+|---|---|---|---|
+| **docling-serve** | Remote (REST) | ★ Yes | Docling via Docker — no local ML deps |
+| **Docling** | Local | No | Direct Docling — requires PyTorch |
+| **PyMuPDF** | Local | Planned | Lightweight PDF inspection |
 
 ```text
-StructureExtractor
+BaseExtractor
       |
-      +-- DoclingExtractor
-      +-- PyMuPDFExtractor
-      +-- FutureExtractor
+      +-- DoclingServeExtractor ★ (recommended)
+      +-- DoclingManifestExtractor (legacy)
+      +-- PyMuPDFExtractor (planned)
 ```
 
 ## Canonical Document Structure
@@ -207,28 +236,24 @@ Canonical Document Structure
 
 ### Model Storage
 
-Large machine learning models should preferably not be permanently embedded into every application image.
-
-A recommended deployment model is:
+With **docling-serve** as the default backend, ML models are managed by the docling-serve container and cached in a persistent Docker volume:
 
 ```text
-Container image
+docling-serve container
   |
-  +-- Application
-  +-- Runtime dependencies
   +-- Docling
+  +-- PyTorch
+  +-- RapidOCR
   |
-  +----> Persistent model storage
+  +----> Volume: docling-models (/root/.cache/docling)
 ```
 
-Models may be stored in:
+The Acessilia Structure Extractor container remains slim (~200 MB) and model-free.
 
-- persistent Docker volumes;
-- host-mounted directories;
-- shared model caches;
-- object storage, when appropriate.
+For the legacy local Docling setup, models are stored in:
 
-This reduces repeated downloads and avoids rebuilding very large container images when only application code changes.
+- `~/.cache/docling` (Linux/macOS)
+- `/root/.cache/docling` (Docker volume)
 
 ## Relationship with Acessilia
 
@@ -255,7 +280,7 @@ In this architecture:
 
 > **Agents decide; specialized services execute capabilities.**
 
-The Acessilia planner should not need to know whether structural extraction is performed by Docling, PyMuPDF, or another backend.
+The Acessilia planner should not need to know whether structural extraction is performed by docling-serve, Docling, PyMuPDF, or another backend.
 
 ## Technology Stack
 
@@ -264,7 +289,8 @@ The initial implementation is expected to use technologies such as:
 - Python
 - FastAPI
 - Model Context Protocol (MCP)
-- Docling
+- docling-serve (recommended — Docling via REST API)
+- Docling (legacy — local installation)
 - PyMuPDF
 - Pydantic
 - JSON Schema

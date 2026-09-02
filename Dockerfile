@@ -1,6 +1,9 @@
 # Dockerfile para o Acessilia Structure Extractor
 #
-# Variantes de build:
+# Uso recomendado:
+#   docker compose up -d                    # Sobe com docling-serve
+#
+# Build manual:
 #   docker build --target production -t acessilia-extractor:latest .
 #   docker build --target with-docling -t acessilia-extractor:with-docling .
 #   docker build --target validate-snapshots -t acessilia-extractor:validate .
@@ -24,7 +27,14 @@ COPY src/ ./src/
 # Instala o pacote base (sem docling)
 RUN pip install --upgrade pip && pip install . && rm -rf ~/.cache
 
-# === Estágio com Docling (para validação de snapshots) ===
+# === Estágio de produção: usa docling-serve remoto (padrão) ===
+FROM base AS production
+COPY . .
+EXPOSE 8000
+ENV DOCLING_SERVE_URL="http://docling-serve:5001"
+CMD ["acessilia-extract"]
+
+# === Estágio com Docling local (legado) ===
 FROM base AS with-docling
 
 # Dependências extras do docling/pytorch/rapidocr
@@ -42,20 +52,11 @@ FROM with-docling AS validate-snapshots
 ENTRYPOINT ["python3", "scripts/validate_snapshots.py"]
 CMD ["--help"]
 
-# === Estágio de produção: sem Docling ===
-FROM base AS production
-COPY . .
-EXPOSE 8000
-CMD ["acessilia-extract"]
-
-# === Estágio de teste: sem Docling ===
+# === Estágio de teste ===
 FROM base AS test
 RUN pip install ".[dev]" && rm -rf ~/.cache
 COPY . .
 CMD ["pytest", "tests/", "-v"]
-COPY . .
-EXPOSE 8000
-CMD ["acessilia-extract"]
 
 # === Estágio com Docling embutido (imagem maior) ===
 FROM base AS docling
@@ -72,14 +73,3 @@ FROM docling AS production-docling
 COPY . .
 EXPOSE 8000
 CMD ["acessilia-extract"]
-
-# === Estágio de teste ===
-FROM base AS test
-RUN pip install ".[dev]" && rm -rf ~/.cache
-COPY . .
-CMD ["pytest", "tests/", "-v"]
-
-# === Estágio slim: só httpx + PyMuPDF, aponta para docling-serve remoto ===
-FROM production AS production-serve
-ENV DOCLING_SERVE_URL="http://docling-serve:5001"
-CMD ["sh", "-c", "acessilia-extract --docling-serve $DOCLING_SERVE_URL"]

@@ -4,7 +4,9 @@
 
 This document contains sequence diagrams for the key interaction flows of the **Acessilia Structure Extractor**. Each diagram illustrates the message exchange between components for a specific scenario.
 
-## 1. Document Extraction (CLI — Local Docling)
+## 1. Document Extraction (CLI — Local Docling) [Legacy]
+
+> **Note**: This flow uses local Docling installation. The **recommended** flow is via docling-serve (see diagram 2 below).
 
 ```mermaid
 sequenceDiagram
@@ -59,7 +61,9 @@ sequenceDiagram
     CLI-->>User: Processing Manifest (JSON)
 ```
 
-## 2. Document Extraction (CLI — Remote docling-serve)
+## 2. Document Extraction (CLI — Remote docling-serve) ★
+
+> **Default flow**: This is the recommended extraction path. It requires Docker for docling-serve but avoids local ML dependencies.
 
 ```mermaid
 sequenceDiagram

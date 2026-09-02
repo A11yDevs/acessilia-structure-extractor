@@ -15,13 +15,17 @@ The command-line interface is the current primary means of interaction.
 ### Basic Usage
 
 ```bash
-# Extract structure from a PDF
+# Configure via .env (optional)
+cp .env.example .env
+
+# Extract structure from a PDF (uses docling-serve by default)
+export DOCLING_SERVE_URL=http://localhost:5001
 acessilia-extract document.pdf
 
 # Specify output
 acessilia-extract document.pdf -o result.json
 
-# Use remote docling-serve
+# Explicitly set docling-serve URL
 acessilia-extract document.pdf --docling-serve http://localhost:5001
 
 # Disable OCR
@@ -37,6 +41,7 @@ acessilia-extract document.pdf --schema custom-schema.json
 ### Default Behavior
 
 - **Input**: PDF, DOCX, images (any format supported by Docling)
+- **Backend**: `docling-serve` via `DOCLING_SERVE_URL` env var or `--docling-serve` flag. Falls back to local Docling if neither is set.
 - **Output**: `<document>.processing-manifest.json` in the same directory
 - **Schema**: automatic validation against `schemas/processing_manifest.schema.json`
 - **Language**: `pt-BR` (default)

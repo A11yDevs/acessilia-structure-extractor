@@ -12,13 +12,13 @@
 
 services:
   docling-serve:
-    image: ghcr.io/docling-project/docling-serve-cpu:latest
+    image: ${DOCLING_SERVE_IMAGE:-ghcr.io/docling-project/docling-serve-cpu:v1.32.0}
     ports:
-      - "5001:5001"
+      - "${DOCLING_SERVE_PORT:-5001}:5001"
     volumes:
       - docling-models:/root/.cache/docling
     environment:
-      - DOCLING_SERVE_ENABLE_UI=false
+      - DOCLING_SERVE_ENABLE_UI=${DOCLING_SERVE_ENABLE_UI:-false}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
       interval: 15s

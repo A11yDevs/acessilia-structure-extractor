@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
-from acessilia_extractor.extractors import DoclingExtraction
+from acessilia_extractor.extractors import ExtractionResult
 from acessilia_extractor.manifest.builder import build_processing_manifest
 from acessilia_extractor.manifest.schema import processing_manifest_schema, validate_manifest
 
@@ -73,10 +73,11 @@ class FakeDocument:
 
 
 class FakeExtractor:
-    def extract(self, _: Path) -> DoclingExtraction:
+    def extract(self, _: Path) -> ExtractionResult:
         timestamp = datetime(2026, 7, 27, tzinfo=timezone.utc)
-        return DoclingExtraction(
+        return ExtractionResult(
             document=FakeDocument(),
+            backend="docling",
             started_at=timestamp,
             completed_at=timestamp,
             duration_ms=5,
@@ -169,10 +170,11 @@ def test_preserves_code_text(tmp_path: Path):
             return 1
 
     class CodeExtractor:
-        def extract(self, _: Path) -> DoclingExtraction:
+        def extract(self, _: Path) -> ExtractionResult:
             timestamp = datetime(2026, 7, 27, tzinfo=timezone.utc)
-            return DoclingExtraction(
+            return ExtractionResult(
                 document=CodeDocument(),
+                backend="docling",
                 started_at=timestamp,
                 completed_at=timestamp,
                 duration_ms=5,
@@ -255,10 +257,11 @@ def test_extracts_table_ast_metadata(tmp_path: Path):
             return 1
 
     class TableExtractor:
-        def extract(self, _: Path) -> DoclingExtraction:
+        def extract(self, _: Path) -> ExtractionResult:
             timestamp = datetime(2026, 7, 27, tzinfo=timezone.utc)
-            return DoclingExtraction(
+            return ExtractionResult(
                 document=TableDocument(),
+                backend="docling",
                 started_at=timestamp,
                 completed_at=timestamp,
                 duration_ms=5,

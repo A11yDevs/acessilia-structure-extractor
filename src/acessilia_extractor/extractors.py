@@ -1,4 +1,10 @@
-"""Extraction backends — base interface and implementations."""
+"""Extraction backends — base interface and implementations.
+
+Cada backend de extração é um microserviço acessado via REST.
+O Acessilia Extractor atua como agregador, roteando requisições
+para o backend apropriado e normalizando o resultado no
+Processing Manifest canônico.
+"""
 
 from __future__ import annotations
 
@@ -11,9 +17,20 @@ from typing import Any
 
 
 @dataclass(frozen=True)
-class DoclingExtraction:
-    """Resultado normalizado de uma extração Docling."""
+class ExtractionResult:
+    """Resultado normalizado de uma extração de documento.
+
+    Attributes:
+        document: Objeto documento extraído (formato específico do backend).
+        backend: Nome do backend que produziu a extração.
+        started_at: Momento do início da extração.
+        completed_at: Momento da conclusão.
+        duration_ms: Duração total em milissegundos.
+        version: Versão do backend/extrator.
+        configuration: Configuração usada na extração.
+    """
     document: Any
+    backend: str
     started_at: datetime
     completed_at: datetime
     duration_ms: int
@@ -25,94 +42,9 @@ class BaseExtractor(ABC):
     """Interface comum para extratores de documentos."""
 
     @abstractmethod
-    def extract(self, source_path: Path) -> DoclingExtraction:
+    def extract(self, source_path: Path) -> ExtractionResult:
         """Extrai a estrutura de um documento."""
         ...
-
-
-class DoclingManifestExtractor(BaseExtractor):
-    """Extrator local usando Docling instalado no mesmo ambiente.
-
-    Requer o extra ``[docling]`` instalado:
-        pip install acessilia-structure-extractor[docling]
-    """
-
-    def __init__(
-        self,
-        *,
-        enable_ocr: bool = True,
-        structurer: Any = None,
-    ) -> None:
-        self.enable_ocr = enable_ocr
-        self._structurer = structurer
-
-    def extract(self, source_path: Path) -> DoclingExtraction:
-        source_path = source_path.resolve()
-        if not source_path.is_file():
-            raise FileNotFoundError(f"Documento não encontrado: {source_path}")
-
-        if self._structurer is None:
-            converter = self._create_converter()
-        else:
-            converter = self._structurer
-
-        started_at = datetime.now(timezone.utc)
-        started_clock = perf_counter()
-        document = self._convert_document(converter, source_path)
-        duration_ms = round((perf_counter() - started_clock) * 1000)
-        completed_at = datetime.now(timezone.utc)
-
-        return DoclingExtraction(
-            document=document,
-            started_at=started_at,
-            completed_at=completed_at,
-            duration_ms=duration_ms,
-            version=_package_version("docling"),
-            configuration={
-                "ocr": self.enable_ocr,
-                "table_structure": True,
-                "remote_services": False,
-            },
-        )
-
-    def _create_converter(self) -> Any:
-        try:
-            from docling.document_converter import DocumentConverter
-        except ImportError:
-            raise RuntimeError(
-                "Docling não está instalado. "
-                "Execute: pip install 'acessilia-structure-extractor[docling]'"
-            )
-
-        from docling.datamodel.base_models import InputFormat
-        from docling.datamodel.pipeline_options import (
-            PdfPipelineOptions,
-            RapidOcrOptions,
-        )
-        from docling.document_converter import PdfFormatOption
-
-        pdf_options = PdfPipelineOptions()
-        pdf_options.do_ocr = self.enable_ocr
-        pdf_options.do_table_structure = True
-        pdf_options.ocr_options = RapidOcrOptions(backend="torch")
-        if hasattr(pdf_options, "enable_remote_services"):
-            pdf_options.enable_remote_services = False
-        return DocumentConverter(
-            format_options={
-                InputFormat.PDF: PdfFormatOption(pipeline_options=pdf_options),
-            }
-        )
-
-    @staticmethod
-    def _convert_document(converter: Any, source_path: Path) -> Any:
-        if hasattr(converter, "convert"):
-            result = converter.convert(str(source_path))
-            return result.document
-        if hasattr(converter, "_process_document"):
-            return converter._process_document(source_path)
-        raise RuntimeError(
-            "Conversor incompatível: esperado convert() ou _process_document()."
-        )
 
 
 class DoclingServeExtractor(BaseExtractor):
@@ -128,7 +60,7 @@ class DoclingServeExtractor(BaseExtractor):
     def __init__(self, base_url: str = "http://docling-serve:5001"):
         self.base_url = base_url.rstrip("/")
 
-    def extract(self, source_path: Path) -> DoclingExtraction:
+    def extract(self, source_path: Path) -> ExtractionResult:
         import httpx
 
         source_path = source_path.resolve()
@@ -139,8 +71,6 @@ class DoclingServeExtractor(BaseExtractor):
         started_clock = perf_counter()
 
         with httpx.Client(base_url=self.base_url, timeout=600) as client:
-            # 1. Envia o arquivo via multipart (síncrono — não usa fila)
-            #    Precisa de to_formats=["json"] para receber json_content
             with source_path.open("rb") as f:
                 upload_resp = client.post(
                     "/v1/convert/file",
@@ -150,20 +80,19 @@ class DoclingServeExtractor(BaseExtractor):
             upload_resp.raise_for_status()
             result = upload_resp.json()
 
-            # A resposta do docling-serve v1.30+ tem formato:
-            # { "document": { "json_content": { ... DoclingDocument ... } }, ... }
             doc_entry = result.get("document") or {}
             json_content = doc_entry.get("json_content")
             if json_content is not None:
-                docling_doc = json_content  # já é dict
+                docling_doc = json_content
             else:
                 docling_doc = result
 
         duration_ms = round((perf_counter() - started_clock) * 1000)
         completed_at = datetime.now(timezone.utc)
 
-        return DoclingExtraction(
+        return ExtractionResult(
             document=_BuildDoclingDocument(docling_doc),
+            backend="docling",
             started_at=started_at,
             completed_at=completed_at,
             duration_ms=duration_ms,

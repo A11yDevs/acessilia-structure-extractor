@@ -19,19 +19,13 @@ dependencies = [
     "jsonschema",
     "httpx>=0.28",
     "PyMuPDF",
+    "python-dotenv>=1.0",
 ]
 
 [project.scripts]
 acessilia-extract = "acessilia_extractor.cli:main"
 
 [project.optional-dependencies]
-docling = [
-    "docling>=2",
-]
-docling-serve = [
-    "docling-core>=2",
-    "httpx>=0.28",
-]
 dev = [
     "pytest>=7",
     "pytest-asyncio",

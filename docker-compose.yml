@@ -1,24 +1,44 @@
 # docker-compose para desenvolvimento e produção
 #
 # Uso:
-#   docker compose up -d                  # Sobe structure-extractor com docling
+#   docker compose up -d                  # Sobe structure-extractor + docling-serve
 #   docker compose run --rm test          # Executa testes
 #   docker compose run --rm validate      # Valida snapshots
 
 version: "3.9"
 
 services:
-  # --- Serviço principal (com docling) ---
+  # --- docling-serve (recomendado) ---
+  docling-serve:
+    image: ${DOCLING_SERVE_IMAGE:-ghcr.io/docling-project/docling-serve-cpu:v1.32.0}
+    ports:
+      - "${DOCLING_SERVE_PORT:-5001}:5001"
+    volumes:
+      - docling-models:/root/.cache/docling
+    environment:
+      - DOCLING_SERVE_ENABLE_UI=${DOCLING_SERVE_ENABLE_UI:-false}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 300s
+
+  # --- Serviço principal (usa docling-serve) ---
   acessilia-extractor:
     build:
       context: .
-      target: with-docling
-    image: acessilia-extractor:with-docling
+      target: production
+    image: acessilia-extractor:latest
     ports:
       - "8000:8000"
     volumes:
       - ./var:/app/var
-      - docling-models:/root/.cache/docling
+    environment:
+      - DOCLING_SERVE_URL=${DOCLING_SERVE_URL:-http://docling-serve:5001}
+    depends_on:
+      docling-serve:
+        condition: service_healthy
     command: ["acessilia-extract"]
 
   # --- Testes ---
@@ -46,5 +66,4 @@ services:
     command: ["scripts/validate_snapshots.py"]
 
 volumes:
-  docling-models:
   docling-models:

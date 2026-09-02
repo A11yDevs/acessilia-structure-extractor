@@ -54,11 +54,21 @@ Use semantic prefixes:
 # Install development dependencies
 pip install ".[dev]"
 
-# Run tests
+# Configure environment (optional — .env is gitignored)
+cp .env.example .env
+
+# Start docling-serve (required for snapshot tests)
+docker run -d \
+  --name docling-serve \
+  -p 5001:5001 \
+  -v docling-models:/root/.cache/docling \
+    ghcr.io/docling-project/docling-serve-cpu:v1.32.0
+
+# Run tests (reads DOCLING_SERVE_URL from .env or defaults)
 pytest tests/ -v
 
-# Check coverage (when configured)
-pytest tests/ --cov=src/
+# Or use Docker Compose for the full test suite
+docker compose -f docker-compose.test-snapshot.yml up --build validator
 ```
 
 ### 5. Submit a Pull Request

@@ -16,6 +16,7 @@ It isolates heavy dependencies (Docling, ML models) from the main Acessilia runt
 | [Installation](installation.md) | Setup, configuration, Docker, build variants |
 | [Tools](tools.md) | Docling, PyMuPDF, docling-serve and their features |
 | [API](api.md) | REST, MCP, OpenAPI, consumption contracts |
+| [Testing](testing.md) | Unit tests, snapshot integration tests, and validation workflow |
 | [Contribution](contribution.md) | How to contribute, submitting a PR, coding standards |
 | [Constitution](constitution.md) | Language, objective, schemas, project principles |
 

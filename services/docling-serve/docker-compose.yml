@@ -1,0 +1,24 @@
+# docling-serve — Serviço de extração Docling
+#
+# Uso:
+#   docker compose -f services/docling-serve/docker-compose.yml up -d
+#   docker compose -f services/docling-serve/docker-compose.yml logs -f
+
+services:
+  docling-serve:
+    image: ${DOCLING_SERVE_IMAGE:-ghcr.io/docling-project/docling-serve-cpu:v1.32.0}
+    ports:
+      - "${DOCLING_SERVE_PORT:-5001}:5001"
+    volumes:
+      - docling-models:/root/.cache/docling
+    environment:
+      - DOCLING_SERVE_ENABLE_UI=${DOCLING_SERVE_ENABLE_UI:-false}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 300s
+
+volumes:
+  docling-models:

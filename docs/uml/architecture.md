@@ -27,8 +27,8 @@ graph TB
     end
 
     subgraph "Infrastructure Layer"
-        DOCLING[Docling Engine]
-        DOCLING_SERVE[docling-serve Client]
+        DOCLING_SERVE[docling-serve ★]
+        DOCLING[Docling Engine<br/>Legacy]
         PYMUPDF[PyMuPDF<br/>Planned]
         FS[File System]
     end
@@ -37,9 +37,9 @@ graph TB
     REST --> EXTRACTOR
     MCP --> EXTRACTOR
 
-    EXTRACTOR --> DOCLING
     EXTRACTOR --> DOCLING_SERVE
-    EXTRACTOR --> PYMUPDF
+    EXTRACTOR -.-> DOCLING
+    EXTRACTOR -.-> PYMUPDF
     EXTRACTOR --> BUILDER
 
     BUILDER --> PIPELINE
@@ -60,7 +60,7 @@ graph TB
 | **Presentation** | CLI, REST API, MCP | Interface with users and external systems |
 | **Application** | Extractor Service, Manifest Builder, Schema Validator | Orchestrate extraction and manifest generation |
 | **Domain** | Processing Manifest Models, JSON Schema, Text Pipeline | Core business logic and canonical representation |
-| **Infrastructure** | Docling, docling-serve, PyMuPDF, File System | External tools and I/O |
+| **Infrastructure** | docling-serve, Docling, PyMuPDF, File System | External tools and I/O |
 
 ### Package Diagram
 
@@ -279,22 +279,19 @@ graph TB
 graph LR
     subgraph "Dockerfile Stages"
         BASE[base<br/>python:3.11-slim]
-        PROD[production]
-        WITH_DOCLING[with-docling]
+        PROD[production ★]
+        WITH_DOCLING[with-docling<br/>Legacy]
         PROD_DOCLING[production-docling]
-        PROD_SERVE[production-serve]
         TEST_STAGE[test]
         VAL_STAGE[validate-snapshots]
     end
 
     BASE --> PROD
-    BASE --> WITH_DOCLING
+    BASE -.-> WITH_DOCLING
     BASE --> TEST_STAGE
 
     WITH_DOCLING --> PROD_DOCLING
     WITH_DOCLING --> VAL_STAGE
-
-    PROD --> PROD_SERVE
 ```
 
 ### Network Architecture
@@ -326,7 +323,7 @@ graph TB
 | `acessilia-extractor` (production) | python:3.11-slim | ~200 MB | 8000 | httpx, PyMuPDF, pydantic |
 | `acessilia-extractor` (with-docling) | python:3.11-slim | ~3 GB | 8000 | + docling, torch, rapidocr |
 | `docling-serve` | ghcr.io/docling-project/serve-cpu | ~3 GB | 5001 | docling, torch, rapidocr |
-| `validator` | python:3.11-slim + docling | ~3 GB | — | + dataset submodule |
+| `validator` | python:3.11-slim | ~200 MB | — | + httpx (uses docling-serve) |
 | `test` | python:3.11-slim | ~200 MB | — | + pytest |
 
 ### Data Flow Diagram
@@ -371,8 +368,8 @@ graph LR
 | **Schema Validation** | jsonschema (Draft 2020-12) | — |
 | **HTTP Client** | httpx | >= 0.28 |
 | **PDF/Light Extraction** | PyMuPDF | — |
-| **Full Extraction** | Docling | >= 2 |
-| **Remote Extraction** | docling-serve | latest |
+| **Full Extraction** | docling-serve (recommended) | latest |
+| **Local Extraction** | Docling | >= 2 |
 | **OCR** | RapidOCR | — |
 | **ML Runtime** | PyTorch (CPU) | — |
 | **Testing** | pytest | >= 7 |

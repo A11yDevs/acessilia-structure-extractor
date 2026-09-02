@@ -43,7 +43,7 @@ class BaseExtractor(ABC):
 
 ### 3. Separation of Concerns
 
-- **Extractors**: communication with backends (Docling, docling-serve, PyMuPDF)
+- **Extractors**: communication with backends (docling-serve, Docling, PyMuPDF)
 - **Manifest**: construction, models, validation of the Processing Manifest
 - **Pipeline**: sanitization, table normalization
 - **CLI**: user interface
@@ -130,10 +130,10 @@ Multi-stage build with specific targets:
 | Target | Base | Docling | Usage |
 |---|---|---|---|
 | `base` | python:3.11-slim | ❌ | Minimal base image |
-| `production` | base | ❌ | Production (remote docling-serve) |
-| `with-docling` | base | ✅ | Development and validation |
+| `production` | base | ❌ | **Default** — uses remote docling-serve |
+| `with-docling` | base | ✅ | Legacy — local Docling (not recommended) |
 | `production-docling` | with-docling | ✅ | Production with Docling |
-| `production-serve` | production | ❌ | Production pointing to docling-serve |
+
 | `test` | base | ❌ | Unit tests |
 | `validate-snapshots` | with-docling | ✅ | Snapshot validation |
 
@@ -160,5 +160,5 @@ The package is published as `acessilia-structure-extractor` on PyPI (planned). C
 |---|---|
 | [A11yDevs/acessilia](https://github.com/A11yDevs/acessilia) | Central project — consumes the Structure Extractor |
 | [A11yDevs/acessilia-dataset](https://github.com/A11yDevs/acessilia-dataset) | Document dataset for testing (submodule) |
-| [docling-project/docling](https://github.com/docling-project/docling) | Primary extraction engine |
+| [docling-project/docling](https://github.com/docling-project/docling) | Document understanding engine (used via docling-serve) |
 | [docling-project/docling-serve](https://github.com/docling-project/docling-serve) | Docling REST server |

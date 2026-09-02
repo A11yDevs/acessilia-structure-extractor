@@ -20,17 +20,17 @@ graph TB
     end
 
     subgraph "Backends"
-        DOCLING[Docling]
-        DOCLING_SERVE[docling-serve]
+        DOCLING_SERVE[docling-serve ★]
+        DOCLING[Docling (local)]
         PYMUPDF[PyMuPDF]
     end
 
     CLI --> EXTRACTORS
     API --> EXTRACTORS
     MCP --> EXTRACTORS
-    EXTRACTORS --> DOCLING
     EXTRACTORS --> DOCLING_SERVE
-    EXTRACTORS --> PYMUPDF
+    EXTRACTORS -.-> DOCLING
+    EXTRACTORS -.-> PYMUPDF
     EXTRACTORS --> MANIFEST
     MANIFEST --> PIPELINE
     MANIFEST --> SCHEMA
@@ -78,8 +78,8 @@ graph TB
 
 Defines the abstract `BaseExtractor` interface and two implementations:
 
+- **`DoclingServeExtractor`** (recommended): Remote extraction via the `docling-serve` REST API. Sends the file via multipart upload and receives the serialized `DoclingDocument` as JSON. Includes the `_BuildDoclingDocument` wrapper for compatibility with the builder's expected interface. This is the **default** backend.
 - **`DoclingManifestExtractor`**: Local extraction using Docling installed in the same environment. Requires the `[docling]` extra. Configures the PDF pipeline with OCR (RapidOCR) and table structure detection.
-- **`DoclingServeExtractor`**: Remote extraction via the `docling-serve` REST API. Sends the file via multipart upload and receives the serialized `DoclingDocument` as JSON. Includes the `_BuildDoclingDocument` wrapper for compatibility with the builder's expected interface.
 
 Both return a `DoclingExtraction` (dataclass) with the extracted document, timestamps, duration, and configuration.
 
@@ -137,7 +137,7 @@ sequenceDiagram
     participant S as Schema
 
     C->>E: Document (PDF/DOCX/image)
-    E->>E: Extract with Docling or docling-serve
+    E->>E: Extract with docling-serve (recommended) or local Docling
     E-->>B: DoclingExtraction
     B->>P: Sanitize texts
     B->>P: Normalize tables
@@ -167,8 +167,8 @@ The `BaseExtractor` interface allows adding new backends without modifying the b
 
 | Backend | Type | Use Case |
 |---|---|---|
-| Docling | Local | Full pipeline with OCR and tables |
-| docling-serve | Remote (REST) | When Docling runs in another container |
+| docling-serve | Remote (REST) ★ | **Recommended** — Docling in Docker, no local ML |
+| Docling | Local | Legacy — full pipeline with OCR and tables |
 | PyMuPDF | Planned | Lightweight extraction without ML |
 
 ### Multi-stage Docker
@@ -177,9 +177,8 @@ The `Dockerfile` offers multiple targets for different scenarios:
 
 | Target | Docling | Use Case |
 |---|---|---|
-| `production` | ❌ | Minimal production image |
-| `with-docling` | ✅ | Development and validation |
+| `production` | ❌ | **Default** — uses remote docling-serve |
+| `with-docling` | ✅ | Legacy — local Docling (not recommended) |
 | `validate-snapshots` | ✅ | Snapshot validation |
 | `production-docling` | ✅ | Production with embedded Docling |
-| `production-serve` | ❌ | Points to remote docling-serve |
 | `test` | ❌ | Unit tests |
